@@ -4,8 +4,9 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'OutlookPSTRecovery/**'
+      - 'OutlookPSTRecovery.Web/**'
       - '.github/workflows/build-outlook-pst.yml'
+      - 'README.md'
 
 permissions:
   contents: read
@@ -21,7 +22,7 @@ jobs:
       - name: Publish self-contained single-file Windows x64 executable
         shell: pwsh
         run: |
-          dotnet publish OutlookPSTRecovery/OutlookPSTRecovery.csproj `
+          dotnet publish OutlookPSTRecovery.Web/OutlookPSTRecovery.Web.csproj `
             --configuration Release `
             --runtime win-x64 `
             --self-contained true `
@@ -33,7 +34,7 @@ jobs:
             --output publish-outlook-pst
       - uses: actions/upload-artifact@v4
         with:
-          name: OutlookPSTRecovery-win-x64
+          name: OutlookPSTRecovery-Web-win-x64
           path: publish-outlook-pst/OutlookPSTRecovery.exe
           if-no-files-found: error
           retention-days: 30
