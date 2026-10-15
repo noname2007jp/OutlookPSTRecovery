@@ -92,23 +92,16 @@ internal sealed class MainForm : Form
                 $"ドキュメント: {GetDocumentsPath()}",
                 $"Outlook起動中: {(IsOutlookRunning() ? "はい（修復には終了が必要）" : "いいえ")}",
                 "",
-                "検索対象:"
+                "検索対象（ユーザーフォルダー内を再帰検索。AppData全体は除外）:"
             };
             messages.AddRange(roots.Select(p => $"  {(Directory.Exists(p) ? "検出" : "なし")}  {p}"));
 
             foreach (var root in roots.Where(Directory.Exists))
             {
-                try
+                foreach (var path in EnumeratePstFiles(root, messages.Add))
                 {
-                    foreach (var file in Directory.EnumerateFiles(root, "*.pst", SearchOption.AllDirectories))
-                    {
-                        try { files[file] = new FileInfo(file); }
-                        catch { /* inaccessible entry */ }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    messages.Add($"検索警告: {root} — {ex.Message}");
+                    try { files[path] = new FileInfo(path); }
+                    catch (Exception ex) { messages.Add($"ファイル確認警告: {path} — {ex.Message}"); }
                 }
             }
 
@@ -141,7 +134,7 @@ internal sealed class MainForm : Form
             messages.Add("判定:");
             if (_candidates.Count == 0)
             {
-                messages.Add("PSTが標準の検索場所で見つかりません。OneDriveのWeb上・別フォルダー・別ユーザーの保存先を確認してください。");
+                messages.Add("検索したユーザーフォルダー内でPSTが見つかりません。別ユーザーの保存先、別ドライブ、またはクラウド上のみのファイルを確認してください。");
             }
             else if (_candidates.Any(c => c.InOneDrive))
             {
@@ -349,16 +342,81 @@ internal sealed class MainForm : Form
     private static List<string> GetSearchRoots()
     {
         var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var docs = GetDocumentsPath();
-        roots.Add(Path.Combine(docs, "Outlook Files"));
-        roots.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents", "Outlook Files"));
-        roots.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "Outlook"));
+
+        // ユーザーフォルダー全体を検索し、Outlook Files / Outlook ファイルなどの
+        // フォルダー名や言語設定に依存しないようにする。
+        if (Directory.Exists(userProfile)) roots.Add(Path.GetFullPath(userProfile));
+        if (Directory.Exists(docs)) roots.Add(Path.GetFullPath(docs));
+
+        // AppData全体は巨大になりやすいため除外し、Outlookの既知の保存場所だけ別途検索する。
+        var localOutlook = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "Outlook");
+        if (Directory.Exists(localOutlook)) roots.Add(Path.GetFullPath(localOutlook));
+
+        // OneDriveがユーザーフォルダー外に設定されている場合も検索対象にする。
         foreach (var od in GetOneDriveRoots())
-        {
-            roots.Add(Path.Combine(od, "Documents", "Outlook Files"));
-            roots.Add(Path.Combine(od, "Outlook Files"));
-        }
+            if (Directory.Exists(od)) roots.Add(Path.GetFullPath(od));
+
         return roots.ToList();
+    }
+
+    private static IEnumerable<string> EnumeratePstFiles(string root, Action<string> addWarning)
+    {
+        var userProfile = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
+            .TrimEnd(Path.DirectorySeparatorChar);
+        var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar);
+        var isUserProfileRoot = string.Equals(normalizedRoot, userProfile, StringComparison.OrdinalIgnoreCase);
+        var pending = new Stack<string>();
+        pending.Push(normalizedRoot);
+
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+
+            try
+            {
+                foreach (var path in Directory.EnumerateFiles(current, "*.pst", SearchOption.TopDirectoryOnly))
+                    yield return path;
+            }
+            catch (Exception ex)
+            {
+                addWarning($"検索警告: {current} — {ex.Message}");
+            }
+
+            IEnumerable<string> subdirectories;
+            try
+            {
+                subdirectories = Directory.EnumerateDirectories(current, "*", SearchOption.TopDirectoryOnly).ToArray();
+            }
+            catch (Exception ex)
+            {
+                addWarning($"フォルダー確認警告: {current} — {ex.Message}");
+                continue;
+            }
+
+            foreach (var directory in subdirectories)
+            {
+                // ユーザーフォルダー直下の AppData は規模が大きいため全体検索しない。
+                // LocalAppData\\Microsoft\\Outlook は検索ルートとして別途追加している。
+                if (isUserProfileRoot &&
+                    string.Equals(Path.GetFileName(directory), "AppData", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                try
+                {
+                    // ジャンクションやシンボリックリンクをたどって循環・重複検索するのを防ぐ。
+                    if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
+                        continue;
+                    pending.Push(directory);
+                }
+                catch (Exception ex)
+                {
+                    addWarning($"フォルダー属性確認警告: {directory} — {ex.Message}");
+                }
+            }
+        }
     }
 
     private static List<string> GetOutlookProfileNames()
