@@ -102,7 +102,13 @@ internal static class Program
             }
             if (request.Kind == "destination")
             {
-                lock (StateLock) folder = SelectedDestination;
+                lock (StateLock)
+                {
+                    folder = SelectedDestination;
+                    if (folder is null && request.Id is not null && Candidates.TryGetValue(request.Id, out var selectedCandidate))
+                        folder = FindKnownDestination(selectedCandidate);
+                    if (folder is not null) SelectedDestination = folder;
+                }
                 if (folder is null) return Results.BadRequest(new { error = "先に保存先フォルダーを選択してください。" });
             }
             if (folder is null || !Directory.Exists(folder))
