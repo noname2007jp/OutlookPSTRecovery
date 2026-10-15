@@ -1,29 +1,39 @@
-# Outlook PST Recovery
+# Outlook PST 一括復旧ツール
 
-Windows 11 / classic Outlook / POP accounts.
+Windows 11 のクラシック版 Outlook で、POP アカウントの PST ファイルの保存場所を確認し、OneDrive 配下などにある PST をローカルへ安全にコピーするためのツールです。
 
-## Usage
-1. Launch `OutlookPSTRecovery.exe`.
-2. Click **1. 解析** to inspect common PST locations and display file path, size, modified time, OneDrive status, Outlook process state, and Outlook profile names.
-3. Select the intended PST row.
-4. Close classic Outlook normally, then click **2. 解析結果から修復**.
-5. The program copies the selected PST into a local folder and verifies the copy with SHA-256.
-6. Optionally open Outlook Mail setup to inspect the Data Files tab and POP delivery location.
+## 使い方
 
-## Safety
-- Source PSTs are never deleted or overwritten.
-- Existing recovery copies are not overwritten.
-- Outlook must be closed before copy/repair.
-- The program does not automatically modify Outlook profiles or POP delivery settings. Verify the correct PST and delivery location manually.
-- Files marked as offline/cloud placeholders are not copied.
-- A verified copy does not guarantee that the PST itself is healthy.
+1. `OutlookPSTRecovery.exe` を起動します。
+2. **「1. 解析」** をクリックし、PST ファイルを検索します。
+3. 一覧で、復旧対象と思われる PST の保存場所・サイズ・更新日時・OneDrive 配下かどうかを確認し、対象ファイルを選択します。
+4. クラシック版 Outlook を通常の方法で終了します。必要に応じて、タスクマネージャーで `OUTLOOK.EXE` が終了したことも確認してください。
+5. **「2. 解析結果から修復」** をクリックし、確認メッセージで続行します。
+6. PST がローカルの復旧フォルダーにコピーされ、コピー元とコピー先の SHA-256 ハッシュが一致することを確認します。
+7. 必要に応じて開くメール設定画面で、［データ ファイル］タブや POP アカウントの配信先を確認します。設定を変更する場合は、対象の PST が正しいことを確認してから手動で行ってください。
 
-## Local output
-- Copies: `%LOCALAPPDATA%\OutlookPSTRecovery\Restored`
-- Logs: `%LOCALAPPDATA%\OutlookPSTRecovery\Logs`
+## 安全上の注意
 
-## Build
-The GitHub Actions workflow **Build Outlook PST Recovery** publishes a self-contained, single-file Windows x64 EXE. Open the repository's Actions tab, select the workflow run, and download the `OutlookPSTRecovery-win-x64` artifact.
+- **元の PST ファイルは削除・上書きしません。**
+- 同名の復旧コピーが存在する場合は、別のファイル名で保存します。
+- PST のコピー・修復処理を行う前に、Outlook を終了する必要があります。
+- オンラインのみのファイル（クラウド上にあり、端末に実体がない可能性のあるファイル）はコピーしません。エクスプローラーで対象ファイルを右クリックし、［このデバイス上で常に保持する］を選んでダウンロードを完了してから、再度解析してください。
+- コピー元とコピー先の SHA-256 が一致しても、PST ファイル内部の破損がないことまでは保証しません。
+- このツールは Outlook のプロファイルや POP の配信先を自動変更しません。復旧コピーを Outlook に設定した後は、送受信と過去メールの表示を確認してください。確認が完了するまでは元の PST を削除しないでください。
 
-## Scope
-The current version scans common Outlook/OneDrive folders and does not search every drive or cloud-only online location. It is a safe copy-and-verify recovery assistant, not a full automatic Outlook profile editor.
+## 保存先
+
+- 復旧コピー：`%LOCALAPPDATA%\OutlookPSTRecovery\Restored`
+- ログ：`%LOCALAPPDATA%\OutlookPSTRecovery\Logs`
+
+## EXE の入手方法
+
+GitHub リポジトリの [Actions](https://github.com/noname2007jp/OutlookPSTRecovery/actions) を開き、**Build Outlook PST Recovery** の実行結果を選択します。ビルドが成功していれば、成果物（Artifacts）から `OutlookPSTRecovery-win-x64` をダウンロードできます。
+
+この成果物は Windows x64 向けの自己完結型・単一ファイル EXE です。ビルド結果が成功になっていることを確認してから利用してください。
+
+## 現在の対応範囲
+
+- 一般的な Outlook／OneDrive の保存場所を検索します。
+- すべてのドライブや、クラウド上にしか存在しないファイルを網羅的に検索するものではありません。
+- PST の安全なコピーとコピー検証を支援するツールです。PST 内部の修復や Outlook プロファイルの完全な自動復旧を行うものではありません。
