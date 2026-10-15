@@ -52,18 +52,18 @@ function render(){
  const tbody=$("results");tbody.replaceChildren();
  if(!items.length){tbody.innerHTML='<tr><td colspan="5" class="muted">PSTファイルは見つかりませんでした。</td></tr>';return;}
  for(const x of items){
-  const tr=document.createElement("tr");if(x.Id===selectedId)tr.className="selected";
-  const status=x.IsOffline?"オンラインのみの可能性あり":x.InOneDrive?"OneDrive配下":"ローカル候補";
-  tr.innerHTML='<td><input type="radio" name="candidate" aria-label="対象を選択"></td><td><strong>'+escapeHtml(x.Name)+'</strong><div class="path muted">'+escapeHtml(x.Path)+'</div>'+(x.knownDestination?'<div class="muted">記録済み保存先：'+escapeHtml(x.knownDestination)+'</div>':'')+'</td><td>'+sizeText(x.Size)+'</td><td>'+escapeHtml(x.lastWrite)+'</td><td><span class="tag">'+status+'</span></td>';
-  tr.querySelector("input").checked=x.Id===selectedId;
-  tr.querySelector("input").addEventListener("change",()=>select(x.Id));
-  tr.addEventListener("click",e=>{if(e.target.tagName!=="INPUT")select(x.Id);});
+  const tr=document.createElement("tr");if(x.id===selectedId)tr.className="selected";
+  const status=x.isOffline?"オンラインのみの可能性あり":x.inOneDrive?"OneDrive配下":"ローカル候補";
+  tr.innerHTML='<td><input type="radio" name="candidate" aria-label="対象を選択"></td><td><strong>'+escapeHtml(x.name)+'</strong><div class="path muted">'+escapeHtml(x.path)+'</div>'+(x.knownDestination?'<div class="muted">記録済み保存先：'+escapeHtml(x.knownDestination)+'</div>':'')+'</td><td>'+sizeText(x.size)+'</td><td>'+escapeHtml(x.lastWrite)+'</td><td><span class="tag">'+status+'</span></td>';
+  tr.querySelector("input").checked=x.id===selectedId;
+  tr.querySelector("input").addEventListener("change",()=>select(x.id));
+  tr.addEventListener("click",e=>{if(e.target.tagName!=="INPUT")select(x.id);});
   tbody.appendChild(tr);
  }
 }
 function select(id){
  selectedId=id;const x=items.find(y=>y.Id===id);render();
- $("selectedDetails").textContent=x?"選択中: "+x.Path:"";
+ $("selectedDetails").textContent=x?"選択中: "+x.path:"";
  for(const id of ["openSource","backup","remember"])$(id).disabled=!x;
  if(x&&x.knownDestination){$("dest").value=x.knownDestination;$("openDest").disabled=false;$("remember").disabled=false;}
 }
