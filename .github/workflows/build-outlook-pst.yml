@@ -1,0 +1,39 @@
+name: Build Outlook PST Recovery
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'OutlookPSTRecovery/**'
+      - '.github/workflows/build-outlook-pst.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Publish self-contained single-file Windows x64 executable
+        shell: pwsh
+        run: |
+          dotnet publish OutlookPSTRecovery/OutlookPSTRecovery.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:DebugType=none `
+            -p:DebugSymbols=false `
+            --output publish-outlook-pst
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OutlookPSTRecovery-win-x64
+          path: publish-outlook-pst/OutlookPSTRecovery.exe
+          if-no-files-found: error
+          retention-days: 30
