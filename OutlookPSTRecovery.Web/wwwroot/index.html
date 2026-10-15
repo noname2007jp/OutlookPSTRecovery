@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Outlook PST 一括復旧ツール</title>
+<style>
+:root{font-family:system-ui,"Meiryo",sans-serif;color:#172033;background:#f4f6fa}body{margin:0}header{background:#1c3765;color:white;padding:22px max(20px,calc((100% - 1180px)/2))}main{max-width:1180px;margin:24px auto;padding:0 18px}.panel{background:white;border:1px solid #dce2eb;border-radius:12px;padding:18px;margin-bottom:18px;box-shadow:0 2px 8px #15284b0a}h1{font-size:1.35rem;margin:0 0 5px}h2{font-size:1.05rem;margin:0 0 12px}p{line-height:1.6}.muted{color:#5c6678;font-size:.92rem}.row{display:flex;flex-wrap:wrap;gap:9px;align-items:center}button{border:0;border-radius:7px;padding:10px 14px;background:#2455a6;color:white;font-weight:600;cursor:pointer}button.secondary{background:#e8edf5;color:#172033}button:disabled{opacity:.5;cursor:not-allowed}#status{margin-left:4px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{text-align:left;padding:10px;border-bottom:1px solid #e7ebf1;vertical-align:top}th{background:#f8f9fc;white-space:nowrap}tr.selected{background:#edf4ff}.path{overflow-wrap:anywhere;min-width:240px}.tag{display:inline-block;padding:3px 7px;border-radius:5px;background:#e8edf5;font-size:.8rem}.warn{background:#fff5dd;border-left:4px solid #d79a13;padding:12px}.ok{color:#167447}.error{color:#a11c2a}#log{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.9rem;min-height:24px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.field{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}input{padding:10px;border:1px solid #cbd3e0;border-radius:7px;min-width:min(450px,90%)}@media(max-width:650px){header{padding:18px}main{padding:0 10px}.panel{padding:13px}}
+</style>
+</head>
+<body>
+<header><h1>Outlook PST 一括復旧ツール</h1><div>インストール不要・PC内処理・ブラウザー操作</div></header>
+<main>
+<section class="panel">
+<h2>1. PSTファイルを検索</h2>
+<p class="muted">ユーザーフォルダー、ドキュメント、OneDrive、Outlookの既知の保存先を検索します。PSTの内容は外部へ送信しません。</p>
+<div class="row"><button id="scan">PSTを検索</button><span id="status" class="muted">未検索</span></div>
+<div id="scanNote" class="muted"></div>
+</section>
+<section class="panel">
+<h2>2. 検索結果</h2>
+<div class="table-wrap"><table><thead><tr><th>選択</th><th>ファイル</th><th>サイズ</th><th>更新日時</th><th>状態</th></tr></thead><tbody id="results"><tr><td colspan="5" class="muted">「PSTを検索」を実行してください。</td></tr></tbody></table></div>
+<div id="selectedDetails" class="muted"></div>
+<div class="actions">
+<button id="openSource" class="secondary" disabled>元のフォルダーを開く</button>
+<button id="backup" disabled>バックアップを作成・検証</button>
+</div>
+</section>
+<section class="panel">
+<h2>3. 保存先を確認</h2>
+<p>以前にこのツールで記録した保存先が一致する場合は候補として表示します。履歴がない場合、現在のOneDriveフォルダーだけから元の保存先を推測しません。</p>
+<div class="row"><button id="choose" class="secondary">保存先フォルダーを選択</button><button id="openDest" class="secondary" disabled>保存先をエクスプローラーで開く</button></div>
+<div class="field"><input id="dest" placeholder="保存先フォルダー（選択すると自動入力）"><button id="remember" class="secondary" disabled>この保存先を記録</button></div>
+<p class="warn">このツールはPSTを自動移動しません。バックアップと保存先を確認後、エクスプローラーで利用者自身がファイルを移動してください。元のPSTは、Outlookの送受信と過去メールを確認するまで削除しないでください。</p>
+</section>
+<section class="panel"><h2>処理結果</h2><div id="log" role="status" aria-live="polite">準備完了</div></section>
+</main>
+<script>
+const token="__SESSION_TOKEN__";
+let items=[], selectedId=null;
+const $=id=>document.getElementById(id);
+async function api(path,body={}) {
+ const response=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json","X-Session-Token":token},body:JSON.stringify(body)});
+ const data=await response.json().catch(()=>({error:"応答を読み取れませんでした。"}));
+ if(!response.ok)throw new Error(data.error||data.detail||"処理に失敗しました。");
+ return data;
+}
+function say(message,kind=""){ $("log").className=kind; $("log").textContent=message; }
+function sizeText(n){if(n<1024)return n+" B";const u=["KB","MB","GB","TB"];let i=-1;do{n/=1024;i++;}while(n>=1024&&i<u.length-1);return n.toFixed(1)+" "+u[i];}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function render(){
+ const tbody=$("results");tbody.replaceChildren();
+ if(!items.length){tbody.innerHTML='<tr><td colspan="5" class="muted">PSTファイルは見つかりませんでした。</td></tr>';return;}
+ for(const x of items){
+  const tr=document.createElement("tr");if(x.Id===selectedId)tr.className="selected";
+  const status=x.IsOffline?"オンラインのみの可能性あり":x.InOneDrive?"OneDrive配下":"ローカル候補";
+  tr.innerHTML='<td><input type="radio" name="candidate" aria-label="対象を選択"></td><td><strong>'+escapeHtml(x.Name)+'</strong><div class="path muted">'+escapeHtml(x.Path)+'</div>'+(x.knownDestination?'<div class="muted">記録済み保存先：'+escapeHtml(x.knownDestination)+'</div>':'')+'</td><td>'+sizeText(x.Size)+'</td><td>'+escapeHtml(x.lastWrite)+'</td><td><span class="tag">'+status+'</span></td>';
+  tr.querySelector("input").checked=x.Id===selectedId;
+  tr.querySelector("input").addEventListener("change",()=>select(x.Id));
+  tr.addEventListener("click",e=>{if(e.target.tagName!=="INPUT")select(x.Id);});
+  tbody.appendChild(tr);
+ }
+}
+function select(id){
+ selectedId=id;const x=items.find(y=>y.Id===id);render();
+ $("selectedDetails").textContent=x?"選択中: "+x.Path:"";
+ for(const id of ["openSource","backup","remember"])$(id).disabled=!x;
+ if(x&&x.knownDestination){$("dest").value=x.knownDestination;$("openDest").disabled=false;$("remember").disabled=false;}
+}
+$("scan").onclick=async()=>{
+ $("scan").disabled=true;$("status").textContent="検索中…";say("PSTファイルを検索しています。フォルダー数によっては時間がかかります。");
+ try{const r=await api("/api/scan");items=r.candidates;selectedId=null;render();select(items[0]?.Id||null);$("scanNote").textContent=r.note;$("status").textContent=items.length+" 件";say(items.length+" 件のPSTファイルが見つかりました。");}
+ catch(e){$("status").textContent="エラー";say(e.message,"error");}finally{$("scan").disabled=false;}
+};
+$("openSource").onclick=async()=>{try{const r=await api("/api/open-folder",{kind:"source",id:selectedId});say("元ファイルのフォルダーを開きました: "+r.path,"ok");}catch(e){say(e.message,"error");}};
+$("backup").onclick=async()=>{
+ if(!selectedId)return;
+ if(!confirm("Outlookを終了していることを確認してください。選択したPSTをバックアップし、SHA-256を照合します。続行しますか？"))return;
+ $("backup").disabled=true;say("バックアップとハッシュ検証中です。大きなPSTでは時間がかかります。");
+ try{const r=await api("/api/backup",{id:selectedId});say(r.message+"\n保存先: "+r.path+"\nSHA-256: "+r.sha256,"ok");}
+ catch(e){say(e.message,"error");}finally{$("backup").disabled=!selectedId;}
+};
+$("choose").onclick=async()=>{
+ try{const r=await api("/api/select-destination");if(r.path){$("dest").value=r.path;$("openDest").disabled=false;$("remember").disabled=!selectedId;say("保存先を選択しました: "+r.path,"ok");}}
+ catch(e){say(e.message,"error");}
+};
+$("openDest").onclick=async()=>{try{const r=await api("/api/open-folder",{kind:"destination"});say("保存先フォルダーを開きました: "+r.path,"ok");}catch(e){say(e.message,"error");}};
+$("remember").onclick=async()=>{
+ if(!selectedId)return;const destination=$("dest").value.trim();
+ try{const r=await api("/api/remember-destination",{id:selectedId,destination});say(r.message,"ok");}
+ catch(e){say(e.message,"error");}
+};
+$("dest").addEventListener("input",()=>{$("openDest").disabled=!$("dest").value.trim();$("remember").disabled=!selectedId||!$("dest").value.trim();});
+</script>
+</body></html>
