@@ -84,7 +84,7 @@ $("choose").onclick=async()=>{
  try{const r=await api("/api/select-destination");if(r.path){$("dest").value=r.path;$("openDest").disabled=false;$("remember").disabled=!selectedId;say("保存先を選択しました: "+r.path,"ok");}}
  catch(e){say(e.message,"error");}
 };
-$("openDest").onclick=async()=>{try{const r=await api("/api/open-folder",{kind:"destination"});say("保存先フォルダーを開きました: "+r.path,"ok");}catch(e){say(e.message,"error");}};
+$("openDest").onclick=async()=>{try{const r=await api("/api/open-folder",{kind:"destination",id:selectedId});say("保存先フォルダーを開きました: "+r.path,"ok");}catch(e){say(e.message,"error");}};
 $("remember").onclick=async()=>{
  if(!selectedId)return;const destination=$("dest").value.trim();
  try{const r=await api("/api/remember-destination",{id:selectedId,destination});say(r.message,"ok");}
