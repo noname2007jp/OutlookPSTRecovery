@@ -375,15 +375,19 @@ internal sealed class MainForm : Form
         {
             var current = pending.Pop();
 
+            string[] pstFiles;
             try
             {
-                foreach (var path in Directory.EnumerateFiles(current, "*.pst", SearchOption.TopDirectoryOnly))
-                    yield return path;
+                pstFiles = Directory.EnumerateFiles(current, "*.pst", SearchOption.TopDirectoryOnly).ToArray();
             }
             catch (Exception ex)
             {
                 addWarning($"検索警告: {current} — {ex.Message}");
+                pstFiles = Array.Empty<string>();
             }
+
+            foreach (var path in pstFiles)
+                yield return path;
 
             IEnumerable<string> subdirectories;
             try
